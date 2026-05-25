@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sales Daily Report</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script>emailjs.init("1xqHVrcs5xrGDcNed");</script>
+<style>
+  :root {
+    --bg: #0f1117; --surface: #1a1d27; --surface2: #22263a;
+    --accent: #4f8ef7; --accent2: #f7934f; --green: #3ecf8e;
+    --red: #f75f5f; --text: #e8eaf0; --muted: #7b82a0;
+    --border: #2e3350; --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 20px 16px 80px; }
+
+  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+  .header-left h1 { font-family: 'Space Mono', monospace; font-size: 20px; color: var(--accent); letter-spacing: -0.5px; }
+  .header-left p { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .date-badge { font-family: 'Space Mono', monospace; font-size: 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; color: var(--accent); }
+
+  /* Summary */
+  .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 20px; }
+  .summary-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 8px; text-align: center; }
+  .summary-card .label { font-size: 9px; color: var(--muted); margin-bottom: 5px; letter-spacing: 0.5px; }
+  .summary-card .value { font-family: 'Space Mono', monospace; font-size: 14px; font-weight: 700; }
+  .summary-card.blue .value { color: var(--accent); }
+  .summary-card.orange .value { color: var(--accent2); }
+  .summary-card.green .value { color: var(--green); }
+  .summary-card.yellow .value { color: #f7cf4f; }
+  .summary-card.hidden { display: none; }
+
+  /* Section */
+  .section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 16px; overflow: hidden; }
+  .section-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--border); background: var(--surface2); }
+  .section-title { font-size: 13px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px; }
+  .section-title .icon { width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+  .icon-blue { background: rgba(79,142,247,0.15); }
+  .icon-orange { background: rgba(247,147,79,0.15); }
+  .icon-green { background: rgba(62,207,142,0.15); }
+  .section-body { padding: 16px; }
+
+  /* Fields */
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .field-row.full { grid-template-columns: 1fr; }
+  .field-row.three { grid-template-columns: 1fr 1fr 1fr; }
+  .field label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 5px; letter-spacing: 0.3px; }
+  .field input, .field select, .field textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: 'Noto Sans KR', sans-serif; font-size: 13px; padding: 9px 12px; outline: none; transition: border-color 0.2s; }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
+  .field textarea { resize: vertical; min-height: 70px; }
+  .field select option { background: var(--surface); }
+  .field input[readonly] { background: var(--surface2); color: var(--accent); }
+
+  /* HQ Banner */
+  .hq-banner { background: rgba(79,142,247,0.08); border: 1px solid rgba(79,142,247,0.25); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; display: flex; align-items: center; gap: 12px; }
+  .hq-dot { width: 14px; height: 14px; background: var(--accent); border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 8px rgba(79,142,247,0.6); }
+  .hq-info .hq-label { font-size: 10px; color: var(--muted); margin-bottom: 2px; letter-spacing: 0.5px; }
+  .hq-info .hq-name { font-size: 13px; font-weight: 700; color: var(--accent); }
+  .hq-info .hq-addr { font-size: 11px; color: var(--muted); }
+
+  /* Vehicle toggle */
+  .vehicle-toggle { display: flex; gap: 8px; margin-bottom: 12px; }
+  .vehicle-btn { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--muted); font-size: 13px; cursor: pointer; text-align: center; transition: all 0.2s; }
+  .vehicle-btn.active { border-color: var(--accent); background: rgba(79,142,247,0.1); color: var(--accent); font-weight: 700; }
+
+  /* Odometer */
+  .odometer-section { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-top: 4px; }
+  .odometer-row { display: grid; grid-template-columns: 1fr 24px 1fr 24px 1fr; align-items: center; gap: 6px; margin-bottom: 12px; }
+  .odometer-arrow { text-align: center; color: var(--muted); font-size: 14px; }
+  .divider { height: 1px; background: var(--border); margin: 10px 0; }
+
+  /* Distance result — always shown */
+  .distance-result { display: flex; justify-content: space-between; align-items: center; padding: 10px 0 4px; }
+  .dist-label { font-size: 11px; color: var(--muted); }
+  .dist-value { font-family: 'Space Mono', monospace; font-size: 16px; color: var(--accent); font-weight: 700; }
+
+  /* Mileage reimbursement — personal only */
+  .reimburse-box { background: rgba(247,207,79,0.08); border: 1px solid rgba(247,207,79,0.25); border-radius: 8px; padding: 12px 14px; margin-top: 10px; display: none; }
+  .reimburse-box.show { display: block; }
+  .reimburse-header { font-size: 10px; color: #f7cf4f; letter-spacing: 0.5px; margin-bottom: 8px; font-weight: 700; }
+  .reimburse-row { display: flex; justify-content: space-between; align-items: center; }
+  .reimburse-label { font-size: 12px; color: var(--muted); }
+  .reimburse-value { font-family: 'Space Mono', monospace; font-size: 18px; color: #f7cf4f; font-weight: 700; }
+  .reimburse-note { font-size: 10px; color: var(--muted); margin-top: 4px; }
+
+  /* Timer */
+  .time-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .time-display { font-family: 'Space Mono', monospace; font-size: 28px; color: var(--accent); font-weight: 700; letter-spacing: 2px; }
+  .time-status { font-size: 11px; padding: 3px 8px; border-radius: 20px; font-weight: 600; }
+  .status-active { background: rgba(62,207,142,0.15); color: var(--green); }
+  .status-idle { background: rgba(123,130,160,0.15); color: var(--muted); }
+
+  /* Pay box */
+  .pay-box { background: rgba(62,207,142,0.08); border: 1px solid rgba(62,207,142,0.2); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; }
+  .pay-box-row { display: flex; justify-content: space-between; align-items: center; }
+  .pay-label { font-size: 12px; color: var(--muted); }
+  .pay-amount { font-family: 'Space Mono', monospace; font-size: 18px; color: var(--green); font-weight: 700; }
+  .pay-divider { height: 1px; background: rgba(62,207,142,0.15); margin: 8px 0; }
+  .pay-total-row { display: flex; justify-content: space-between; align-items: center; }
+  .pay-total-label { font-size: 12px; color: var(--green); font-weight: 700; }
+  .pay-total-amount { font-family: 'Space Mono', monospace; font-size: 20px; color: var(--green); font-weight: 700; }
+  .personal-pay-row { display: none; }
+  .personal-pay-row.show { display: flex; justify-content: space-between; align-items: center; }
+
+  /* Buttons */
+  .btn { border: none; border-radius: 8px; font-family: 'Noto Sans KR', sans-serif; font-size: 13px; font-weight: 700; padding: 10px 18px; cursor: pointer; transition: all 0.2s; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #3a7aee; }
+  .btn-danger { background: var(--red); color: #fff; }
+  .btn-success { background: var(--green); color: #0f1117; }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* Visit cards */
+  .visit-list { display: flex; flex-direction: column; gap: 10px; }
+  .visit-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; position: relative; }
+  .visit-card-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 6px; }
+  .visit-number { width: 22px; height: 22px; background: var(--accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: 'Space Mono', monospace; font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0; }
+  .visit-info { flex: 1; margin-left: 10px; }
+  .visit-name { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+  .visit-meta { font-size: 11px; color: var(--muted); display: flex; gap: 10px; flex-wrap: wrap; }
+  .visit-result { font-size: 12px; padding: 3px 8px; border-radius: 20px; font-weight: 600; flex-shrink: 0; }
+  .result-success { background: rgba(62,207,142,0.15); color: var(--green); }
+  .result-pending { background: rgba(79,142,247,0.15); color: var(--accent); }
+  .result-fail { background: rgba(247,95,95,0.15); color: var(--red); }
+  .visit-note { font-size: 12px; color: var(--muted); margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); line-height: 1.5; }
+  .visit-delete { position: absolute; top: 10px; right: 10px; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 16px; padding: 2px 6px; border-radius: 4px; }
+  .visit-delete:hover { color: var(--red); }
+
+  /* Route timeline */
+  .route-wrap { margin-bottom: 16px; display: none; }
+  .route-wrap.show { display: block; }
+  .route-label { font-size: 10px; color: var(--muted); letter-spacing: 0.5px; margin-bottom: 10px; }
+  .route-timeline { position: relative; padding-left: 28px; }
+  .route-timeline::before { content: ''; position: absolute; left: 9px; top: 16px; bottom: 16px; width: 2px; background: var(--border); }
+  .route-point { position: relative; margin-bottom: 14px; }
+  .route-dot { position: absolute; left: -24px; top: 4px; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--accent); background: var(--bg); }
+  .route-dot.s { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 6px rgba(79,142,247,0.5); }
+  .route-dot.e { background: var(--red); border-color: var(--red); box-shadow: 0 0 6px rgba(247,95,95,0.5); }
+  .route-time { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--accent); margin-bottom: 2px; }
+  .route-place { font-size: 13px; font-weight: 500; color: var(--text); }
+  .route-sub { font-size: 11px; color: var(--muted); }
+
+  /* Add visit form */
+  .add-visit-form { background: var(--bg); border: 1px dashed var(--border); border-radius: 10px; padding: 14px; margin-top: 12px; display: none; }
+  .add-visit-form.open { display: block; }
+  .empty-state { text-align: center; padding: 24px; color: var(--muted); font-size: 13px; }
+  .empty-state .icon { font-size: 28px; margin-bottom: 8px; }
+
+  /* Submit */
+  .submit-section { padding: 16px; background: var(--surface2); border-top: 1px solid var(--border); }
+  .submit-btn { width: 100%; padding: 14px; font-size: 15px; }
+
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--green); color: #0f1117; font-weight: 700; font-size: 13px; padding: 12px 24px; border-radius: 24px; transition: transform 0.3s; z-index: 1000; white-space: nowrap; }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1>📋 Daily Sales Report</h1>
+    <p>Tronic Holdings — Field Sales</p>
+  </div>
+  <div class="date-badge" id="todayDate"></div>
+</header>
+
+<!-- Summary: 4 cards, mileage pay only shows for personal -->
+<div class="summary-grid">
+  <div class="summary-card blue">
+    <div class="label">HOURS</div>
+    <div class="value" id="summaryHours">0h 00m</div>
+  </div>
+  <div class="summary-card orange">
+    <div class="label">VISITS</div>
+    <div class="value" id="summaryVisits">0</div>
+  </div>
+  <div class="summary-card green">
+    <div class="label">BASE PAY</div>
+    <div class="value" id="summaryWage">$0.00</div>
+  </div>
+  <div class="summary-card yellow hidden" id="summaryMileCard">
+    <div class="label">MILE PAY</div>
+    <div class="value" id="summaryMile">$0.00</div>
+  </div>
+</div>
+
+<!-- Rep Info -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-title"><div class="icon icon-blue">👤</div>Rep Info</div>
+  </div>
+  <div class="section-body">
+    <div class="field-row">
+      <div class="field">
+        <label>Sales Rep Name</label>
+        <input type="text" id="repName" placeholder="Full name">
+      </div>
+      <div class="field">
+        <label>Hourly Rate ($/hr)</label>
+        <input type="text" id="hourlyWage" value="$17.00 / hr (fixed)" readonly style="background:var(--surface2); color:var(--green); font-weight:700; cursor:not-allowed;">
+      </div>
+    </div>
+
+    <div class="hq-banner">
+      <div class="hq-dot"></div>
+      <div class="hq-info">
+        <div class="hq-label">DEPARTURE / RETURN BASE</div>
+        <div class="hq-name">Company HQ</div>
+        <div class="hq-addr">1717 Aeros Way, Montebello, CA 90640</div>
+      </div>
+    </div>
+
+    <!-- Vehicle -->
+    <div class="field" style="margin-bottom:8px;"><label>Vehicle Type</label></div>
+    <div class="vehicle-toggle">
+      <div class="vehicle-btn active" onclick="selectVehicle(this,'Company Vehicle')">🚗 Company Vehicle</div>
+      <div class="vehicle-btn" onclick="selectVehicle(this,'Personal Vehicle')">🚙 Personal Vehicle</div>
+    </div>
+    <input type="hidden" id="vehicleType" value="Company Vehicle">
+
+    <!-- Odometer — always visible -->
+    <div class="odometer-section">
+      <div style="font-size:10px; color:var(--muted); margin-bottom:10px; letter-spacing:0.5px;">ODOMETER READING</div>
+      <div class="odometer-row">
+        <div class="field" style="margin:0;">
+          <label>Start (mi)</label>
+          <input type="number" id="kmStart" placeholder="0" oninput="updateKm()">
+        </div>
+        <div class="odometer-arrow">→</div>
+        <div class="field" style="margin:0;">
+          <label>End (mi)</label>
+          <input type="number" id="kmEnd" placeholder="0" oninput="updateKm()">
+        </div>
+        <div class="odometer-arrow">=</div>
+        <div class="field" style="margin:0;">
+          <label>Total Miles</label>
+          <input type="text" id="kmTotal" placeholder="auto" readonly>
+        </div>
+      </div>
+
+      <!-- Distance always shown -->
+      <div class="distance-result">
+        <div class="dist-label">🚘 Total Distance Driven</div>
+        <div class="dist-value" id="distDisplay">— mi</div>
+      </div>
+
+      <!-- Mileage reimbursement: personal vehicle only -->
+      <div class="reimburse-box" id="reimburseBox">
+        <div class="reimburse-header">💰 PERSONAL VEHICLE — ADDITIONAL MILEAGE PAY</div>
+        <div class="reimburse-row">
+          <div>
+            <div class="reimburse-label">IRS Rate 2025: $0.70 / mile</div>
+            <div class="reimburse-note" id="reimburseCalc">0 mi × $0.70 = $0.00</div>
+          </div>
+          <div class="reimburse-value" id="reimburseAmount">$0.00</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Time Tracking -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-title"><div class="icon icon-orange">⏱</div>Time Tracking</div>
+  </div>
+  <div class="section-body">
+    <div class="time-row">
+      <div class="time-display" id="timerDisplay">00:00:00</div>
+      <div class="time-status status-idle" id="timerStatus">Idle</div>
+    </div>
+
+    <!-- Pay breakdown box -->
+    <div class="pay-box">
+      <div class="pay-box-row">
+        <div class="pay-label">Base Pay &nbsp;<span style="font-size:10px; color:var(--muted);">($17.00/hr fixed)</span></div>
+        <div class="pay-amount" id="currentWage">$0.00</div>
+      </div>
+      <!-- Personal vehicle additional pay row -->
+      <div class="personal-pay-row" id="personalPayRow">
+        <div class="pay-label">+ Mileage Pay &nbsp;<span style="font-size:10px; color:var(--muted);">($0.70/mi)</span></div>
+        <div class="pay-amount" style="color:#f7cf4f;" id="milePayDisplay">$0.00</div>
+      </div>
+      <div class="pay-divider" id="totalDivider" style="display:none;"></div>
+      <div class="pay-total-row" id="totalRow" style="display:none;">
+        <div class="pay-total-label">= Total Est. Pay</div>
+        <div class="pay-total-amount" id="totalPayDisplay">$0.00</div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btnStart" onclick="startTimer()">▶ Start Shift</button>
+      <button class="btn btn-danger" id="btnStop" onclick="stopTimer()" disabled>■ End Shift</button>
+    </div>
+
+    <div class="divider" style="height:1px;background:var(--border);margin:14px 0;"></div>
+    <div style="font-size:10px; color:var(--muted); margin-bottom:10px;">MANUAL TIME ENTRY</div>
+
+    <div class="field-row">
+      <div class="field">
+        <label>Departure Time (from HQ)</label>
+        <input type="time" id="timeIn" oninput="calcManualTime()">
+      </div>
+      <div class="field">
+        <label>Return Time (to HQ)</label>
+        <input type="time" id="timeOut" oninput="calcManualTime()">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Total Hours (auto)</label>
+        <input type="text" id="manualHours" readonly>
+      </div>
+      <div class="field">
+        <label>Base Pay (auto)</label>
+        <input type="text" id="manualPay" readonly>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Visit Log -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-title"><div class="icon icon-green">📍</div>Visit Log & Route</div>
+    <button class="btn btn-outline btn-sm" onclick="toggleAddForm()">+ Add Visit</button>
+  </div>
+  <div class="section-body">
+    <div class="route-wrap" id="routeWrap">
+      <div class="route-label">ROUTE TIMELINE</div>
+      <div class="route-timeline" id="routeTimeline"></div>
+    </div>
+
+    <div class="visit-list" id="visitList">
+      <div class="empty-state" id="emptyState">
+        <div class="icon">🗺️</div>
+        No visits recorded yet.<br>Tap "+ Add Visit" to begin.
+      </div>
+    </div>
+
+    <div class="add-visit-form" id="addVisitForm">
+      <div style="font-size:13px; font-weight:700; margin-bottom:12px; color:var(--accent);">New Visit Entry</div>
+      <div class="field-row">
+        <div class="field">
+          <label>Time of Visit</label>
+          <input type="time" id="newVisitTime">
+        </div>
+        <div class="field">
+          <label>Outcome</label>
+          <select id="newVisitResult">
+            <option value="success">✅ Closed / Order</option>
+            <option value="pending">🔄 Follow-up Needed</option>
+            <option value="fail">❌ No Deal</option>
+          </select>
+        </div>
+      </div>
+      <div class="field-row full">
+        <div class="field">
+          <label>Company / Location Name</label>
+          <input type="text" id="newVisitName" placeholder="Business name">
+        </div>
+      </div>
+      <div class="field-row full">
+        <div class="field">
+          <label>Address</label>
+          <input type="text" id="newVisitAddr" placeholder="Street address (optional)">
+        </div>
+      </div>
+      <div class="field-row full">
+        <div class="field">
+          <label>Sales Notes</label>
+          <textarea id="newVisitNote" placeholder="Products discussed, contact name, next steps..."></textarea>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-success btn-sm" onclick="addVisit()">Save Visit</button>
+        <button class="btn btn-outline btn-sm" onclick="toggleAddForm()">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- GPS Tracking -->
+<div class="section" id="gpsSection">
+  <div class="section-header">
+    <div class="section-title"><div class="icon icon-green">🛰️</div>GPS Route Tracking</div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <div class="time-status status-idle" id="gpsStatus">Off</div>
+    </div>
+  </div>
+  <div class="section-body">
+    <div style="margin-bottom:12px;">
+      <div class="btn-row">
+        <button class="btn btn-success" id="btnGpsStart" onclick="startGPS()">📍 Start Tracking</button>
+        <button class="btn btn-danger" id="btnGpsStop" onclick="stopGPS()" disabled>⏹ Stop Tracking</button>
+        <button class="btn btn-outline btn-sm" onclick="clearGPS()">🗑 Clear</button>
+      </div>
+    </div>
+
+    <!-- Stats row -->
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:12px;">
+      <div style="background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:10px; text-align:center;">
+        <div style="font-size:10px; color:var(--muted); margin-bottom:4px;">GPS POINTS</div>
+        <div style="font-family:'Space Mono',monospace; font-size:16px; color:var(--accent);" id="gpsPointCount">0</div>
+      </div>
+      <div style="background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:10px; text-align:center;">
+        <div style="font-size:10px; color:var(--muted); margin-bottom:4px;">GPS MILES</div>
+        <div style="font-family:'Space Mono',monospace; font-size:16px; color:var(--accent2);" id="gpsMiles">0.0 mi</div>
+      </div>
+      <div style="background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:10px; text-align:center;">
+        <div style="font-size:10px; color:var(--muted); margin-bottom:4px;">LAST UPDATE</div>
+        <div style="font-family:'Space Mono',monospace; font-size:11px; color:var(--green);" id="gpsLastUpdate">—</div>
+      </div>
+    </div>
+
+    <!-- Map -->
+    <div id="gpsMap" style="width:100%; height:320px; border-radius:10px; border:1px solid var(--border); background:var(--bg); overflow:hidden;">
+      <div style="display:flex; align-items:center; justify-content:center; height:100%; color:var(--muted); font-size:13px; flex-direction:column; gap:8px;">
+        <div style="font-size:28px;">🗺️</div>
+        <div>Press "Start Tracking" to begin</div>
+      </div>
+    </div>
+
+    <div style="font-size:11px; color:var(--muted); margin-top:8px; text-align:center;">
+      ⚠️ Keep this app open while driving. Browser must stay active for GPS to work.
+    </div>
+  </div>
+</div>
+
+<!-- Daily Summary -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-title"><div class="icon icon-blue">📝</div>Daily Summary</div>
+  </div>
+  <div class="section-body">
+    <div class="field full">
+      <label>Overall Comments / Issues</label>
+      <textarea id="summaryNote" placeholder="Overall assessment of today's activity..." style="min-height:80px;"></textarea>
+    </div>
+    <div class="field full" style="margin-top:10px;">
+      <label>Tomorrow's Plan</label>
+      <textarea id="tomorrowPlan" placeholder="Planned visits, follow-ups, goals for tomorrow..." style="min-height:60px;"></textarea>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="submit-section">
+    <div style="display:flex; gap:10px;">
+      <button class="btn btn-primary submit-btn" onclick="sendEmail()" id="submitBtn" style="flex:2;">📧 Send Report to HQ</button>
+      <button class="btn btn-outline submit-btn" onclick="printReport()" style="flex:1;">🖨️ Print</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const COMPANY_NAME = "Company HQ";
+  const COMPANY_ADDR = "1717 Aeros Way, Montebello, CA 90640";
+  const IRS_RATE = 0.70;
+
+  const today = new Date();
+  document.getElementById('todayDate').textContent =
+    today.toLocaleDateString('en-US', {weekday:'short', year:'numeric', month:'short', day:'numeric'});
+
+  let timerInterval = null, startTime = null, elapsedSeconds = 0, running = false;
+  let isPersonal = false;
+  let totalMiles = 0;
+
+  // ── Vehicle ──────────────────────────────────────────
+  function selectVehicle(el, val) {
+    document.querySelectorAll('.vehicle-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('vehicleType').value = val;
+    isPersonal = (val === 'Personal Vehicle');
+    togglePersonalUI();
+    updatePayBox();
+  }
+
+  function togglePersonalUI() {
+    const reimburse = document.getElementById('reimburseBox');
+    const personalRow = document.getElementById('personalPayRow');
+    const totalDiv = document.getElementById('totalDivider');
+    const totalRow = document.getElementById('totalRow');
+    const mileCard = document.getElementById('summaryMileCard');
+
+    if (isPersonal) {
+      reimburse.classList.add('show');
+      personalRow.classList.add('show');
+      totalDiv.style.display = 'block';
+      totalRow.style.display = 'flex';
+      mileCard.classList.remove('hidden');
+    } else {
+      reimburse.classList.remove('show');
+      personalRow.classList.remove('show');
+      totalDiv.style.display = 'none';
+      totalRow.style.display = 'none';
+      mileCard.classList.add('hidden');
+    }
+  }
+
+  // ── Odometer ─────────────────────────────────────────
+  function updateKm() {
+    const s = parseFloat(document.getElementById('kmStart').value) || 0;
+    const e = parseFloat(document.getElementById('kmEnd').value) || 0;
+    totalMiles = Math.max(0, e - s);
+    document.getElementById('kmTotal').value = totalMiles > 0 ? totalMiles.toFixed(1) + ' mi' : '';
+    document.getElementById('distDisplay').textContent = totalMiles > 0 ? totalMiles.toFixed(1) + ' mi' : '— mi';
+
+    // Mileage reimbursement
+    const reimburse = totalMiles * IRS_RATE;
+    document.getElementById('reimburseCalc').textContent =
+      totalMiles.toFixed(1) + ' mi × $0.70 = $' + reimburse.toFixed(2);
+    document.getElementById('reimburseAmount').textContent = '$' + reimburse.toFixed(2);
+    document.getElementById('summaryMile').textContent = '$' + reimburse.toFixed(2);
+
+    updatePayBox();
+  }
+
+  // ── Timer ─────────────────────────────────────────────
+  function startTimer() {
+    if (running) return;
+    running = true;
+    startTime = Date.now() - elapsedSeconds * 1000;
+    timerInterval = setInterval(tickTimer, 1000);
+    document.getElementById('btnStart').disabled = true;
+    document.getElementById('btnStop').disabled = false;
+    document.getElementById('timerStatus').textContent = 'On Shift';
+    document.getElementById('timerStatus').className = 'time-status status-active';
+    if (!document.getElementById('timeIn').value) {
+      const now = new Date();
+      document.getElementById('timeIn').value =
+        String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+    }
+  }
+
+  function stopTimer() {
+    if (!running) return;
+    running = false;
+    clearInterval(timerInterval);
+    document.getElementById('btnStart').disabled = false;
+    document.getElementById('btnStop').disabled = true;
+    document.getElementById('timerStatus').textContent = 'Shift Ended';
+    document.getElementById('timerStatus').className = 'time-status status-idle';
+    const now = new Date();
+    document.getElementById('timeOut').value =
+      String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+    calcManualTime();
+    renderTimeline();
+  }
+
+  function tickTimer() {
+    elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
+    const h = Math.floor(elapsedSeconds / 3600);
+    const m = Math.floor((elapsedSeconds % 3600) / 60);
+    const s = elapsedSeconds % 60;
+    document.getElementById('timerDisplay').textContent =
+      String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+    updateWage(); updateSummary();
+  }
+
+  function updateWage() {
+    const rate = 17.00;
+    // rate is fixed at $17.00
+    const basePay = rate * elapsedSeconds / 3600;
+    document.getElementById('currentWage').textContent = '$' + basePay.toFixed(2);
+    document.getElementById('summaryWage').textContent = '$' + basePay.toFixed(2);
+    updatePayBox();
+  }
+
+  function updatePayBox() {
+    const rate = 17.00;
+    const basePay = rate * elapsedSeconds / 3600;
+    const milePay = isPersonal ? totalMiles * IRS_RATE : 0;
+    const total = basePay + milePay;
+    document.getElementById('currentWage').textContent = '$' + basePay.toFixed(2);
+    document.getElementById('milePayDisplay').textContent = '$' + milePay.toFixed(2);
+    document.getElementById('totalPayDisplay').textContent = '$' + total.toFixed(2);
+    document.getElementById('summaryWage').textContent = '$' + basePay.toFixed(2);
+    if (isPersonal) document.getElementById('summaryMile').textContent = '$' + milePay.toFixed(2);
+  }
+
+  function calcManualTime() {
+    const tin = document.getElementById('timeIn').value;
+    const tout = document.getElementById('timeOut').value;
+    if (!tin || !tout) return;
+    const [ih, im] = tin.split(':').map(Number);
+    const [oh, om] = tout.split(':').map(Number);
+    let totalMin = (oh*60+om) - (ih*60+im);
+    if (totalMin < 0) totalMin += 1440;
+    const h = Math.floor(totalMin/60), m = totalMin%60;
+    document.getElementById('manualHours').value = h + 'h ' + String(m).padStart(2,'0') + 'm';
+    const rate = 17.00;
+    const pay = rate * totalMin / 60;
+    document.getElementById('manualPay').value = '$' + pay.toFixed(2);
+    if (!running) { elapsedSeconds = totalMin*60; updateWage(); updateSummary(); }
+    renderTimeline();
+  }
+
+  // ── Visits ────────────────────────────────────────────
+  let visits = [];
+  const resultMap = {
+    success: { label:'Closed / Order', cls:'result-success' },
+    pending: { label:'Follow-up',      cls:'result-pending' },
+    fail:    { label:'No Deal',        cls:'result-fail' }
+  };
+
+  function toggleAddForm() {
+    const f = document.getElementById('addVisitForm');
+    f.classList.toggle('open');
+    if (f.classList.contains('open')) {
+      const now = new Date();
+      document.getElementById('newVisitTime').value =
+        String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+    }
+  }
+
+  function addVisit() {
+    const name = document.getElementById('newVisitName').value.trim();
+    if (!name) { showToast('Please enter a company name'); return; }
+    visits.push({ id:Date.now(),
+      time: document.getElementById('newVisitTime').value,
+      name, addr: document.getElementById('newVisitAddr').value.trim(),
+      result: document.getElementById('newVisitResult').value,
+      note: document.getElementById('newVisitNote').value.trim()
+    });
+    visits.sort((a,b) => a.time.localeCompare(b.time));
+    renderVisits(); renderTimeline();
+    document.getElementById('newVisitName').value = '';
+    document.getElementById('newVisitAddr').value = '';
+    document.getElementById('newVisitNote').value = '';
+    document.getElementById('addVisitForm').classList.remove('open');
+    showToast('Visit added!'); updateSummary();
+  }
+
+  function deleteVisit(id) {
+    visits = visits.filter(v => v.id !== id);
+    renderVisits(); renderTimeline(); updateSummary();
+  }
+
+  function renderVisits() {
+    const list = document.getElementById('visitList');
+    const empty = document.getElementById('emptyState');
+    if (!visits.length) { list.innerHTML=''; list.appendChild(empty); return; }
+    empty.style.display='none'; list.innerHTML='';
+    visits.forEach((v,i) => {
+      const r = resultMap[v.result];
+      const card = document.createElement('div');
+      card.className = 'visit-card';
+      card.innerHTML = `
+        <button class="visit-delete" onclick="deleteVisit(${v.id})">×</button>
+        <div class="visit-card-header">
+          <div class="visit-number">${i+1}</div>
+          <div class="visit-info">
+            <div class="visit-name">${v.name}</div>
+            <div class="visit-meta">
+              <span>🕐 ${fmt12(v.time)}</span>
+              ${v.addr ? `<span>📍 ${v.addr}</span>` : ''}
+            </div>
+          </div>
+          <div class="visit-result ${r.cls}">${r.label}</div>
+        </div>
+        ${v.note ? `<div class="visit-note">${v.note}</div>` : ''}`;
+      list.appendChild(card);
+    });
+  }
+
+  function renderTimeline() {
+    const wrap = document.getElementById('routeWrap');
+    const tl = document.getElementById('routeTimeline');
+    const tin = document.getElementById('timeIn').value;
+    const tout = document.getElementById('timeOut').value;
+    if (!visits.length && !tin) { wrap.classList.remove('show'); return; }
+    wrap.classList.add('show'); tl.innerHTML = '';
+    if (tin) tl.innerHTML += point('s', tin, '🏢 ' + COMPANY_NAME + ' — Departure', COMPANY_ADDR);
+    visits.forEach(v => tl.innerHTML += point('', v.time, '📍 ' + v.name, v.addr));
+    if (tout) tl.innerHTML += point('e', tout, '🏢 ' + COMPANY_NAME + ' — Return', COMPANY_ADDR);
+  }
+
+  function point(cls, time, place, sub) {
+    return `<div class="route-point">
+      <div class="route-dot ${cls}"></div>
+      <div class="route-time">${fmt12(time)}</div>
+      <div class="route-place">${place}</div>
+      ${sub ? `<div class="route-sub">${sub}</div>` : ''}
+    </div>`;
+  }
+
+  function fmt12(t) {
+    if (!t) return '';
+    const [h,m] = t.split(':').map(Number);
+    return (h%12||12) + ':' + String(m).padStart(2,'0') + ' ' + (h>=12?'PM':'AM');
+  }
+
+  function updateSummary() {
+    const h = Math.floor(elapsedSeconds/3600), m = Math.floor((elapsedSeconds%3600)/60);
+    document.getElementById('summaryHours').textContent = h + 'h ' + String(m).padStart(2,'0') + 'm';
+    document.getElementById('summaryVisits').textContent = visits.length;
+  }
+
+
+  // ── GPS Tracking ──────────────────────────────────────
+  let gpsWatchId = null;
+  let gpsPoints = [];
+  let gpsMap = null;
+  let gpsPolyline = null;
+  let gpsMarkers = [];
+  let gpsActive = false;
+  let gpsStartMarker = null;
+  let gpsCurrentMarker = null;
+
+  function initMap(lat, lng) {
+    const mapDiv = document.getElementById('gpsMap');
+    gpsMap = new google.maps.Map(mapDiv, {
+      center: { lat, lng },
+      zoom: 13,
+      mapTypeId: 'roadmap',
+      styles: [
+        { elementType: 'geometry', stylers: [{ color: '#1a1d27' }] },
+        { elementType: 'labels.text.fill', stylers: [{ color: '#e8eaf0' }] },
+        { elementType: 'labels.text.stroke', stylers: [{ color: '#0f1117' }] },
+        { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#2e3350' }] },
+        { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#4f8ef7' }] },
+        { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0f1117' }] },
+        { featureType: 'poi', stylers: [{ visibility: 'off' }] }
+      ]
+    });
+    gpsPolyline = new google.maps.Polyline({
+      path: [],
+      geodesic: true,
+      strokeColor: '#4f8ef7',
+      strokeOpacity: 1.0,
+      strokeWeight: 4,
+      map: gpsMap
+    });
+  }
+
+  function startGPS() {
+    if (!navigator.geolocation) {
+      showToast('GPS not supported on this device'); return;
+    }
+    gpsActive = true;
+    document.getElementById('btnGpsStart').disabled = true;
+    document.getElementById('btnGpsStop').disabled = false;
+    document.getElementById('gpsStatus').textContent = 'Tracking';
+    document.getElementById('gpsStatus').className = 'time-status status-active';
+
+    gpsWatchId = navigator.geolocation.watchPosition(
+      onGPSSuccess, onGPSError,
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
+    );
+    showToast('GPS tracking started!');
+  }
+
+  function onGPSSuccess(pos) {
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
+    const point = { lat, lng };
+    const now = new Date();
+
+    gpsPoints.push({ ...point, time: now.toLocaleTimeString('en-US') });
+
+    // Init map on first point
+    if (gpsPoints.length === 1) {
+      initMap(lat, lng);
+      // Start marker (blue dot)
+      gpsStartMarker = new google.maps.Marker({
+        position: point,
+        map: gpsMap,
+        title: 'Start: ' + now.toLocaleTimeString('en-US'),
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 10,
+          fillColor: '#4f8ef7',
+          fillOpacity: 1,
+          strokeColor: '#ffffff',
+          strokeWeight: 2
+        }
+      });
+    }
+
+    // Update polyline
+    const path = gpsPolyline.getPath();
+    path.push(new google.maps.LatLng(lat, lng));
+
+    // Move current position marker
+    if (gpsCurrentMarker) gpsCurrentMarker.setMap(null);
+    gpsCurrentMarker = new google.maps.Marker({
+      position: point,
+      map: gpsMap,
+      title: 'Now: ' + now.toLocaleTimeString('en-US'),
+      icon: {
+        path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+        scale: 5,
+        fillColor: '#3ecf8e',
+        fillOpacity: 1,
+        strokeColor: '#ffffff',
+        strokeWeight: 2,
+        rotation: pos.coords.heading || 0
+      }
+    });
+
+    // Pan map to current
+    gpsMap.panTo(point);
+
+    // Calculate distance
+    const totalMeters = google.maps.geometry.spherical.computeLength(
+      gpsPolyline.getPath().getArray()
+    );
+    const totalMi = (totalMeters * 0.000621371).toFixed(2);
+    document.getElementById('gpsMiles').textContent = totalMi + ' mi';
+    document.getElementById('gpsPointCount').textContent = gpsPoints.length;
+    document.getElementById('gpsLastUpdate').textContent = now.toLocaleTimeString('en-US');
+
+    // Auto-fill odometer suggestion
+    if (gpsPoints.length > 5) {
+      const kmEndEl = document.getElementById('kmEnd');
+      const kmStartEl = document.getElementById('kmStart');
+      if (kmStartEl.value && !kmEndEl.value) {
+        // just show suggestion
+      }
+    }
+  }
+
+  function onGPSError(err) {
+    let msg = 'GPS error';
+    if (err.code === 1) msg = 'GPS permission denied. Please allow location access.';
+    if (err.code === 2) msg = 'GPS position unavailable';
+    if (err.code === 3) msg = 'GPS timeout — retrying...';
+    showToast(msg);
+    document.getElementById('gpsStatus').textContent = 'Error';
+    document.getElementById('gpsStatus').className = 'time-status status-idle';
+  }
+
+  function stopGPS() {
+    if (gpsWatchId !== null) {
+      navigator.geolocation.clearWatch(gpsWatchId);
+      gpsWatchId = null;
+    }
+    gpsActive = false;
+    document.getElementById('btnGpsStart').disabled = false;
+    document.getElementById('btnGpsStop').disabled = true;
+    document.getElementById('gpsStatus').textContent = 'Stopped';
+    document.getElementById('gpsStatus').className = 'time-status status-idle';
+
+    // Add end marker
+    if (gpsPoints.length > 0 && gpsMap) {
+      const last = gpsPoints[gpsPoints.length - 1];
+      new google.maps.Marker({
+        position: { lat: last.lat, lng: last.lng },
+        map: gpsMap,
+        title: 'End',
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 10,
+          fillColor: '#f75f5f',
+          fillOpacity: 1,
+          strokeColor: '#ffffff',
+          strokeWeight: 2
+        }
+      });
+      // Fit bounds to show full route
+      const bounds = new google.maps.LatLngBounds();
+      gpsPoints.forEach(p => bounds.extend(new google.maps.LatLng(p.lat, p.lng)));
+      gpsMap.fitBounds(bounds);
+    }
+    showToast('GPS tracking stopped');
+  }
+
+  function clearGPS() {
+    stopGPS();
+    gpsPoints = [];
+    if (gpsPolyline) gpsPolyline.setPath([]);
+    if (gpsStartMarker) { gpsStartMarker.setMap(null); gpsStartMarker = null; }
+    if (gpsCurrentMarker) { gpsCurrentMarker.setMap(null); gpsCurrentMarker = null; }
+    gpsMap = null;
+    document.getElementById('gpsMiles').textContent = '0.0 mi';
+    document.getElementById('gpsPointCount').textContent = '0';
+    document.getElementById('gpsLastUpdate').textContent = '—';
+    document.getElementById('gpsMap').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:13px;flex-direction:column;gap:8px;"><div style=\'font-size:28px;\'>🗺️</div><div>Press \"Start Tracking\" to begin</div></div>';
+    showToast('GPS data cleared');
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  // ── Shared: build all report variables ───────────────
+  function buildReportData() {
+    const name = document.getElementById('repName').value.trim() || '(not entered)';
+    const rate = 17.00;
+    const vehicle = document.getElementById('vehicleType').value;
+    const kmS = document.getElementById('kmStart').value || '-';
+    const kmE = document.getElementById('kmEnd').value || '-';
+    const kmT = document.getElementById('kmTotal').value || '-';
+    const tin = document.getElementById('timeIn').value;
+    const tout = document.getElementById('timeOut').value;
+    const manH = document.getElementById('manualHours').value || '-';
+    const manPay = document.getElementById('manualPay').value || '$0.00';
+    const milePay = isPersonal ? (totalMiles * IRS_RATE).toFixed(2) : null;
+    const totalPay = isPersonal
+      ? '$' + (parseFloat(manPay.replace('$','')) + totalMiles * IRS_RATE).toFixed(2)
+      : manPay;
+    const sNote = document.getElementById('summaryNote').value || '-';
+    const plan = document.getElementById('tomorrowPlan').value || '-';
+
+    const visitRows = visits.map((v,i) => {
+      const r = resultMap[v.result];
+      return `<tr>
+        <td>${i+1}</td><td>${fmt12(v.time)}</td>
+        <td><b>${v.name}</b></td><td>${v.addr||'-'}</td>
+        <td style="font-weight:600;color:${v.result==='success'?'#1a7a4a':v.result==='pending'?'#1a4a7a':'#7a1a1a'}">${r.label}</td>
+        <td>${v.note||'-'}</td></tr>`;
+    }).join('');
+
+    const routeStr = [
+      tin ? `HQ (${fmt12(tin)})` : '',
+      ...visits.map(v => `${v.name} (${fmt12(v.time)})`),
+      tout ? `HQ (${fmt12(tout)})` : ''
+    ].filter(Boolean).join(' → ');
+
+    const mileSection = isPersonal ? `
+      <h2>MILEAGE REIMBURSEMENT</h2>
+      <div class="info-grid">
+        <div class="info-box" style="border-color:#e8c94a;">
+          <div class="info-label">Total Miles Driven</div>
+          <div class="info-value">${totalMiles.toFixed(1)} mi</div>
+        </div>
+        <div class="info-box" style="border-color:#e8c94a;">
+          <div class="info-label">IRS Rate (2025)</div>
+          <div class="info-value">$0.70 / mile</div>
+        </div>
+        <div class="info-box" style="background:#fffbe8; border-color:#e8c94a;">
+          <div class="info-label">Mileage Pay</div>
+          <div class="info-value" style="color:#b8860b; font-size:18px;">$${milePay}</div>
+        </div>
+        <div class="info-box" style="background:#f0fff8; border-color:#4a9a6a;">
+          <div class="info-label">TOTAL PAY (Base + Mileage)</div>
+          <div class="info-value" style="color:#1a7a4a; font-size:18px;">${totalPay}</div>
+        </div>
+      </div>` : '';
+
+    const visitText = visits.map((v,i) => {
+      const r = resultMap[v.result];
+      return `${i+1}. ${fmt12(v.time)} | ${v.name}${v.addr?' | '+v.addr:''} | ${r.label}${v.note?' | '+v.note:''}`;
+    }).join('\n') || 'No visits recorded';
+
+    const msgBody = `DAILY SALES REPORT
+==================
+Date: ${today.toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}
+Rep: ${name}
+Vehicle: ${vehicle}
+
+HOURS & PAY
+-----------
+Departure: ${fmt12(tin)||'-'}
+Return:    ${fmt12(tout)||'-'}
+Total Hours: ${manH}
+Hourly Rate: $${rate.toFixed(2)}/hr
+Base Pay:    ${manPay}
+${isPersonal
+  ? `Miles Driven: ${totalMiles.toFixed(1)} mi\nMileage Pay:  $${(totalMiles*IRS_RATE).toFixed(2)}\nTOTAL PAY:    ${totalPay}`
+  : `Total Miles: ${kmT}\n(Company vehicle — no mileage pay)`}
+
+ROUTE
+-----
+${routeStr || 'No route recorded'}
+
+VISIT LOG (${visits.length} visits)
+${'-'.repeat(30)}
+${visitText}
+
+DAILY SUMMARY
+-------------
+${sNote}
+
+TOMORROW'S PLAN
+---------------
+${plan}`;
+
+    return { name, rate, vehicle, kmS, kmE, kmT, tin, tout, manH, manPay,
+             milePay, totalPay, sNote, plan, visitRows, routeStr,
+             mileSection, msgBody };
+  }
+
+  // ── Print Report ──────────────────────────────────────
+  function printReport() {
+    const d = buildReportData();
+    const html = buildPrintHTML(d);
+    const win = window.open('', '_blank');
+    if (!win) { showToast('Please allow popups to print'); return; }
+    win.document.write(html);
+    win.document.close();
+  }
+
+  // ── Send Email ────────────────────────────────────────
+  function sendEmail() {
+    const d = buildReportData();
+    if (d.name === '(not entered)') {
+      showToast('Please enter your name first'); return;
+    }
+    const btn = document.getElementById('submitBtn');
+    btn.textContent = '⏳ Sending...';
+    btn.disabled = true;
+
+    emailjs.send('service_e5e12zp', 'template_qefp126', {
+      rep_name: d.name,
+      date: today.toLocaleDateString('en-US', {year:'numeric', month:'long', day:'numeric'}),
+      message: d.msgBody
+    }).then(() => {
+      btn.textContent = '✅ Sent to info@tronicholdings.com';
+      btn.style.background = 'var(--green)';
+      btn.style.color = '#0f1117';
+      showToast('Report sent successfully!');
+      setTimeout(() => {
+        btn.textContent = '📧 Send Report to HQ';
+        btn.style.background = '';
+        btn.style.color = '';
+        btn.disabled = false;
+      }, 4000);
+    }, (err) => {
+      btn.textContent = '❌ Failed — Tap to Retry';
+      btn.style.background = 'var(--red)';
+      btn.disabled = false;
+      showToast('Send failed: ' + (err.text || 'Unknown error'));
+      setTimeout(() => {
+        btn.textContent = '📧 Send Report to HQ';
+        btn.style.background = '';
+        btn.disabled = false;
+      }, 4000);
+      console.error('EmailJS error:', err);
+    });
+  }
+
+  // ── Build print HTML ──────────────────────────────────
+  function buildPrintHTML(d) {
+    return `<!DOCTYPE html><html lang="en"><head>
+      <meta charset="UTF-8">
+      <title>Sales Report — ${d.name} — ${today.toLocaleDateString('en-US')}</title>
+      <style>
+        body{font-family:Arial,sans-serif;font-size:13px;color:#222;padding:30px;max-width:900px;margin:0 auto;}
+        h1{font-size:22px;border-bottom:3px solid #4f8ef7;padding-bottom:8px;margin-bottom:20px;color:#4f8ef7;}
+        h2{font-size:12px;background:#eef3ff;padding:7px 12px;margin:20px 0 10px;border-left:4px solid #4f8ef7;color:#1a3a8a;letter-spacing:.5px;}
+        .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;}
+        .info-box{background:#f8faff;border:1px solid #d8e2f5;border-radius:6px;padding:10px 12px;}
+        .info-label{font-size:10px;color:#888;margin-bottom:3px;text-transform:uppercase;letter-spacing:.5px;}
+        .info-value{font-size:14px;font-weight:700;color:#222;}
+        .hq-box{background:#eef3ff;border:1px solid #b0c4f0;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:12px;}
+        .route-box{background:#f8faff;border:1px solid #d8e2f5;border-radius:6px;padding:12px;margin-bottom:16px;font-size:12px;line-height:1.8;}
+        table{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:12px;}
+        th{background:#4f8ef7;color:#fff;padding:8px 10px;text-align:left;}
+        td{padding:8px 10px;border-bottom:1px solid #e8e8e8;vertical-align:top;}
+        tr:nth-child(even) td{background:#f8faff;}
+        .note-box{background:#fafafa;border:1px solid #ddd;border-radius:6px;padding:12px;white-space:pre-wrap;font-size:12px;line-height:1.6;margin-bottom:10px;}
+        .footer{margin-top:40px;padding-top:12px;border-top:1px solid #ddd;font-size:11px;color:#aaa;display:flex;justify-content:space-between;}
+        @media print{body{padding:10px;}}
+      </style></head><body>
+      <h1>📋 Daily Sales Report</h1>
+      <div class="hq-box">🏢 <b>Base:</b> ${COMPANY_NAME} — ${COMPANY_ADDR}</div>
+      <div class="info-grid">
+        <div class="info-box"><div class="info-label">Date</div><div class="info-value">${today.toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</div></div>
+        <div class="info-box"><div class="info-label">Sales Rep</div><div class="info-value">${d.name}</div></div>
+        <div class="info-box"><div class="info-label">Departure from HQ</div><div class="info-value">${fmt12(d.tin)||'-'}</div></div>
+        <div class="info-box"><div class="info-label">Return to HQ</div><div class="info-value">${fmt12(d.tout)||'-'}</div></div>
+        <div class="info-box"><div class="info-label">Total Hours</div><div class="info-value">${d.manH}</div></div>
+        <div class="info-box"><div class="info-label">Hourly Rate</div><div class="info-value">$${d.rate.toFixed(2)}/hr</div></div>
+        <div class="info-box"><div class="info-label">Base Pay</div><div class="info-value" style="color:#1a7a4a;">${d.manPay}</div></div>
+        <div class="info-box"><div class="info-label">Vehicle</div><div class="info-value">${d.vehicle}</div></div>
+        <div class="info-box"><div class="info-label">Odometer Start</div><div class="info-value">${d.kmS} mi</div></div>
+        <div class="info-box"><div class="info-label">Odometer End</div><div class="info-value">${d.kmE} mi</div></div>
+        <div class="info-box"><div class="info-label">Total Miles</div><div class="info-value">${d.kmT}</div></div>
+        <div class="info-box"><div class="info-label">${isPersonal?'Total Pay (Base + Mileage)':'Base Pay (company vehicle)'}</div>
+          <div class="info-value" style="color:#1a7a4a;font-size:${isPersonal?'18':'14'}px;">${d.totalPay}</div></div>
+      </div>
+      ${d.mileSection}
+      <h2>ROUTE SUMMARY</h2>
+      <div class="route-box">${d.routeStr||'No route recorded'}</div>
+      <h2>VISIT LOG (${visits.length} visits)</h2>
+      <table><thead><tr><th>#</th><th>Time</th><th>Company</th><th>Address</th><th>Outcome</th><th>Notes</th></tr></thead>
+      <tbody>${d.visitRows||'<tr><td colspan="6" style="text-align:center;color:#aaa;">No visits recorded</td></tr>'}</tbody></table>
+      <h2>DAILY SUMMARY</h2>
+      <div class="note-box">${d.sNote}</div>
+      <h2>TOMORROW'S PLAN</h2>
+      <div class="note-box">${d.plan}</div>
+      <div class="footer">
+        <span>Generated: ${new Date().toLocaleString('en-US')}</span>
+        <span>Rep Signature: _______________________</span>
+      </div>
+      <script>window.onload=()=>window.print();<\/script>
+    </body></html>`;
+  }
+</script>
+</body>
+</html>
