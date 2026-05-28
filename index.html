@@ -255,8 +255,8 @@
         <div class="reimburse-header">💰 PERSONAL VEHICLE — ADDITIONAL MILEAGE PAY</div>
         <div class="reimburse-row">
           <div>
-            <div class="reimburse-label">IRS Rate 2025: $0.70 / mile</div>
-            <div class="reimburse-note" id="reimburseCalc">0 mi × $0.70 = $0.00</div>
+            <div class="reimburse-label">Mileage Rate: $0.35 / mile</div>
+            <div class="reimburse-note" id="reimburseCalc">0 mi × $0.35 = $0.00</div>
           </div>
           <div class="reimburse-value" id="reimburseAmount">$0.00</div>
         </div>
@@ -284,7 +284,7 @@
       </div>
       <!-- Personal vehicle additional pay row -->
       <div class="personal-pay-row" id="personalPayRow">
-        <div class="pay-label">+ Mileage Pay &nbsp;<span style="font-size:10px; color:var(--muted);">($0.70/mi)</span></div>
+        <div class="pay-label">+ Mileage Pay &nbsp;<span style="font-size:10px; color:var(--muted);">($0.35/mi)</span></div>
         <div class="pay-amount" style="color:#f7cf4f;" id="milePayDisplay">$0.00</div>
       </div>
       <div class="pay-divider" id="totalDivider" style="display:none;"></div>
@@ -465,7 +465,7 @@
 <script>
   const COMPANY_NAME = "Company HQ";
   const COMPANY_ADDR = "1717 Aeros Way, Montebello, CA 90640";
-  const IRS_RATE = 0.70;
+  const IRS_RATE = 0.35;
 
   const today = new Date();
   document.getElementById('todayDate').textContent =
@@ -518,7 +518,7 @@
     // Mileage reimbursement
     const reimburse = totalMiles * IRS_RATE;
     document.getElementById('reimburseCalc').textContent =
-      totalMiles.toFixed(1) + ' mi × $0.70 = $' + reimburse.toFixed(2);
+      totalMiles.toFixed(1) + ' mi × $0.35 = $' + reimburse.toFixed(2);
     document.getElementById('reimburseAmount').textContent = '$' + reimburse.toFixed(2);
     document.getElementById('summaryMile').textContent = '$' + reimburse.toFixed(2);
 
@@ -937,8 +937,8 @@
           <div class="info-value">${totalMiles.toFixed(1)} mi</div>
         </div>
         <div class="info-box" style="border-color:#e8c94a;">
-          <div class="info-label">IRS Rate (2025)</div>
-          <div class="info-value">$0.70 / mile</div>
+          <div class="info-label">Mileage Rate</div>
+          <div class="info-value">$0.35 / mile</div>
         </div>
         <div class="info-box" style="background:#fffbe8; border-color:#e8c94a;">
           <div class="info-label">Mileage Pay</div>
