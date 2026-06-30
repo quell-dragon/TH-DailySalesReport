@@ -575,40 +575,206 @@ function doMan(){man.s=document.getElementById('manS').value;man.e=document.getE
 
 /* ── End Shift ─────────────────────────── */
 function onEnd(){if(curLoc){openModal('mCO');return;}openModal('mEnd');}
+/* ── Polyline encoder ─────────────────────────────────────── */
+function _pv(v){
+  v=v<0?~(v<<1):v<<1;
+  var r='';
+  while(v>=0x20){r+=String.fromCharCode((0x20|(v&0x1f))+63);v>>=5;}
+  return r+String.fromCharCode(v+63);
+}
+function encodePoly(pts){
+  var r='',la=0,lo=0;
+  pts.forEach(function(p){
+    r+=_pv(Math.round((p.lat-la)*1e5))+_pv(Math.round((p.lng-lo)*1e5));
+    la=p.lat; lo=p.lng;
+  });
+  return r;
+}
+function samplePts(pts,max){
+  if(pts.length<=max)return pts;
+  var step=Math.ceil(pts.length/max),out=[];
+  for(var i=0;i<pts.length;i+=step)out.push(pts[i]);
+  var last=pts[pts.length-1];
+  if(out[out.length-1]!==last)out.push(last);
+  return out;
+}
+
+/* ── Google Static Maps URL ───────────────────────────────── */
+function buildMapUrl(pts, stops){
+  if(!pts||pts.length<2)return '';
+  var KEY='AIzaSyClcWpuT__fvAhvbAd2MDeaKEPL5UI_FVc';
+  var enc=encodePoly(samplePts(pts,180));
+  var s=pts[0], e=pts[pts.length-1];
+  var u='https://maps.googleapis.com/maps/api/staticmap'
+      +'?size=640x400&scale=2&maptype=roadmap';
+  // Dark map style
+  ['all|geometry|0x1a1f2e',
+   'road|geometry|0x2a3050',
+   'road|geometry.stroke|0x4c9cff',
+   'water|geometry|0x0b0f15',
+   'landscape|geometry|0x141a22',
+   'poi|visibility:off',
+   'transit|visibility:off'
+  ].forEach(function(s){
+    var p=s.split('|');
+    if(p.length===3)
+      u+='&style=feature:'+p[0]+'|element:'+p[1]+'|color:0x'+p[2];
+    else
+      u+='&style=feature:'+p[0]+'|'+p[1];
+  });
+  // Route polyline (blue)
+  u+='&path=color:0x4c9cffcc|weight:5|enc:'+encodeURIComponent(enc);
+  // Start marker — green S
+  u+='&markers=color:green|size:mid|label:S'
+    +'|'+s.lat.toFixed(5)+','+s.lng.toFixed(5);
+  // End marker — red E
+  u+='&markers=color:red|size:mid|label:E'
+    +'|'+e.lat.toFixed(5)+','+e.lng.toFixed(5);
+  // Stop markers — blue numbers
+  if(stops&&stops.length){
+    stops.forEach(function(st,i){
+      if(st.lat&&st.lng)
+        u+='&markers=color:blue|size:small|label:'+(i+1)
+          +'|'+st.lat.toFixed(5)+','+st.lng.toFixed(5);
+    });
+  }
+  u+='&key='+KEY;
+  return u;
+}
+
+/* ── Google Maps directions link ──────────────────────────── */
+function buildMapsLink(pts, stops){
+  if(!pts||pts.length<2)return '';
+  var s=pts[0], e=pts[pts.length-1];
+  var url='https://www.google.com/maps/dir/'
+        +s.lat.toFixed(5)+','+s.lng.toFixed(5);
+  // Up to 8 intermediate waypoints
+  if(stops&&stops.length){
+    samplePts(
+      stops.filter(function(st){return st.lat&&st.lng;}), 8
+    ).forEach(function(wp){
+      url+='/'+wp.lat.toFixed(5)+','+wp.lng.toFixed(5);
+    });
+  }
+  url+='/'+e.lat.toFixed(5)+','+e.lng.toFixed(5);
+  return url;
+}
+
+/* ── doSend ───────────────────────────────────────────────── */
 function doSend(){
-  var now=new Date(),oe=document.getElementById('endOdo').value||man.e||'';
-  var es=(document.getElementById('endSum').value||'').trim(),ep=(document.getElementById('endPlan').value||'').trim();
-  evs.push({tp:'ret',t:now,n:'Company HQ',a:HQ});closeModal('mEnd');renderTL();
-  var tot=Math.floor((now.getTime()-t0.getTime())/1000),hrs=(tot/3600).toFixed(2);
-  var gmi=cmi(),isP=vehicle==='Personal Vehicle';
+  var now=new Date();
+  var oe=document.getElementById('endOdo').value||man.e||'';
+  var es=(document.getElementById('endSum').value||'').trim();
+  var ep=(document.getElementById('endPlan').value||'').trim();
+
+  evs.push({tp:'ret',t:now,n:'Company HQ',a:HQ});
+  closeModal('mEnd');
+  renderTL();
+
+  var tot=Math.floor((now.getTime()-t0.getTime())/1000);
+  var hrs=(tot/3600).toFixed(2);
+  var gmi=cmi();
+  var isP=vehicle==='Personal Vehicle';
   var omi=(oe&&man.s)?(parseFloat(oe)-parseFloat(man.s)).toFixed(1):'—';
+
+  // GPS start / end / check-in stops
+  var gpsStart = gpts.length ? gpts[0]             : null;
+  var gpsEnd   = gpts.length ? gpts[gpts.length-1] : null;
+  var ciStops  = evs.filter(function(e){return e.tp==='ci';});
+
+  // Build map assets
+  var mapUrl   = buildMapUrl(gpts, ciStops);
+  var mapsLink = buildMapsLink(gpts, ciStops);
+
+  // Route timeline text
   var lines=[],pv=t0,pn=depName;
   evs.forEach(function(e){
     var dm=Math.round((e.t.getTime()-pv.getTime())/60000);
-    if(e.tp==='dep'){lines.push(ft(e.t)+'  🏢 DEPARTED — '+e.n);}
-    else if(e.tp==='ci'){if(dm>0)lines.push('           ↓ '+dm+' min from '+pn);lines.push(ft(e.t)+'  📍 ARRIVED — '+e.n+(e.a?' ('+e.a+')':''));if(e.p)lines.push('           Purpose: '+e.p);if(e.no)lines.push('           Note: '+e.no);pv=e.t;pn=e.n;}
-    else if(e.tp==='co'){lines.push(ft(e.t)+'  🚗 LEFT — '+e.n+' (stayed '+ds(e.d)+')');lines.push('           Result: '+e.r+(e.no?' | '+e.no:''));pv=e.t;pn=e.n;}
-    else if(e.tp==='ret'){if(dm>0)lines.push('           ↓ '+dm+' min from '+pn);lines.push(ft(e.t)+'  🏁 RETURNED — '+e.n);}
-    else if(e.tp==='note'){lines.push(ft(e.t)+'  📝 '+e.tx);}
+    if(e.tp==='dep'){
+      lines.push(ft(e.t)+'  🏢 DEPARTED — '+e.n+(e.a&&e.a!==e.n?' ('+e.a+')':''));
+    } else if(e.tp==='ci'){
+      if(dm>0)lines.push('           ↓ '+dm+' min drive from '+pn);
+      lines.push(ft(e.t)+'  📍 ARRIVED — '+e.n+(e.a?' ('+e.a+')':''));
+      if(e.p) lines.push('           Purpose: '+e.p);
+      if(e.no)lines.push('           Note: '+e.no);
+      pv=e.t; pn=e.n;
+    } else if(e.tp==='co'){
+      lines.push(ft(e.t)+'  🚗 LEFT — '+e.n+' (stayed '+ds(e.d)+')');
+      lines.push('           Result: '+e.r+(e.no?' | '+e.no:''));
+      pv=e.t; pn=e.n;
+    } else if(e.tp==='ret'){
+      if(dm>0)lines.push('           ↓ '+dm+' min drive from '+pn);
+      lines.push(ft(e.t)+'  🏁 RETURNED — '+e.n);
+    } else if(e.tp==='note'){
+      lines.push(ft(e.t)+'  📝 '+e.tx);
+    }
   });
-  var ci=evs.filter(function(e){return e.tp==='ci';}),co=evs.filter(function(e){return e.tp==='co';});
-  var vl=co.map(function(c,i){return '  '+(i+1)+'. '+(ci[i]?ci[i].n:'?')+' — '+ds(c.d)+' — '+c.r;}).join('\n')||'  None';
-  var msg='━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n📋 DAILY SALES REPORT\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
-    +'Rep:      '+rep+'\nDate:     '+t0.toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'})+'\nVehicle:  '+vehicle+'\n\n'
-    +'⏱ TIME\n─────────────\nStart:       '+ft(t0)+'\nEnd:         '+ft(now)+'\nTotal Hours: '+p2(Math.floor(tot/3600))+'h '+p2(Math.floor((tot%3600)/60))+'m ('+hrs+' hrs)\n'
-    +(isP?'GPS Miles:   '+gmi.toFixed(1)+' mi\nOdo Miles:   '+omi+' mi\nMileage Pay: $'+(gmi*0.35).toFixed(2)+' ($0.35/mi)\n':'Miles (Odo): '+omi+' mi\nGPS Miles:   '+gmi.toFixed(1)+' mi\n(Company vehicle)\n')
-    +'\n📍 VISITS ('+ci.length+' stops)\n─────────────\n'+vl
-    +'\n\n🗺 ROUTE TIMELINE\n─────────────\n'+lines.join('\n')
-    +'\n\n💬 SUMMARY\n─────────────\n'+(es||'(none)')+'\n\n📅 TOMORROW\n─────────────\n'+(ep||'(none)')
-    +(man.c?'\n\n📋 MANUAL NOTES\n─────────────\n'+man.c:'')+'\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
-  var btn=document.getElementById('sendBtn');btn.textContent='⏳ Sending...';btn.disabled=true;
+
+  var ci=evs.filter(function(e){return e.tp==='ci';});
+  var co=evs.filter(function(e){return e.tp==='co';});
+  var vl=co.map(function(c,i){
+    return '  '+(i+1)+'. '+(ci[i]?ci[i].n:'?')+' — '+ds(c.d)+' — '+c.r;
+  }).join('\n')||'  None';
+
+  // GPS location summary
+  var locLines='';
+  if(gpsStart)locLines+='Departure GPS:  '+gpsStart.lat.toFixed(5)+', '+gpsStart.lng.toFixed(5)+'\n';
+  if(gpsEnd)  locLines+='Final GPS:      '+gpsEnd.lat.toFixed(5)+', '+gpsEnd.lng.toFixed(5)+'\n';
+  locLines+='GPS Points:     '+gpts.length+' points recorded';
+  if(mapsLink)locLines+='\nGoogle Maps:    '+mapsLink;
+
+  var msg=
+'━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'+
+'📋 DAILY SALES REPORT\n'+
+'━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'+
+'Rep:      '+rep+'\n'+
+'Date:     '+t0.toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'})+'\n'+
+'Vehicle:  '+vehicle+'\n\n'+
+'⏱ TIME & MILEAGE\n─────────────\n'+
+'Shift Start:  '+ft(t0)+'\n'+
+'Shift End:    '+ft(now)+'\n'+
+'Total Hours:  '+p2(Math.floor(tot/3600))+'h '+p2(Math.floor((tot%3600)/60))+'m ('+hrs+' hrs)\n'+
+(isP?
+  'GPS Miles:    '+gmi.toFixed(1)+' mi\n'+
+  'Odo Miles:    '+omi+' mi\n'+
+  'Mileage Pay:  $'+(gmi*0.35).toFixed(2)+' ($0.35/mi)\n':
+  'Miles (Odo):  '+omi+' mi\n'+
+  'GPS Miles:    '+gmi.toFixed(1)+' mi\n'+
+  '(Company vehicle)\n')+
+'\n📍 VISITS ('+ci.length+' stops)\n─────────────\n'+vl+
+'\n\n🗺 ROUTE TIMELINE\n─────────────\n'+lines.join('\n')+
+'\n\n📡 GPS SUMMARY\n─────────────\n'+locLines+
+'\n\n💬 DAILY SUMMARY\n─────────────\n'+(es||'(none)')+
+'\n\n📅 TOMORROW\'S PLAN\n─────────────\n'+(ep||'(none)')+
+(man.c?'\n\n📋 MANUAL NOTES\n─────────────\n'+man.c:'')+
+'\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
+
+  var btn=document.getElementById('sendBtn');
+  btn.textContent='⏳ Sending...';
+  btn.disabled=true;
+
   loadEJS(function(){
-    emailjs.send('service_e5e12zp','template_qefp126',{rep_name:rep,date:t0.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}),message:msg})
-    .then(function(){
-      active=false;clearInterval(tickID);if(gw)navigator.geolocation.clearWatch(gw);if(wl)wl.release();
+    emailjs.send('service_e5e12zp','template_qefp126',{
+      rep_name:    rep,
+      date:        t0.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}),
+      message:     msg,
+      map_url:     mapUrl,
+      maps_link:   mapsLink,
+      gps_start:   gpsStart ? gpsStart.lat.toFixed(5)+', '+gpsStart.lng.toFixed(5) : 'N/A',
+      gps_end:     gpsEnd   ? gpsEnd.lat.toFixed(5)+', '+gpsEnd.lng.toFixed(5)     : 'N/A',
+      total_miles: gmi.toFixed(1)
+    }).then(function(){
+      active=false;
+      clearInterval(tickID);
+      if(gw)navigator.geolocation.clearWatch(gw);
+      if(wl)wl.release();
       localStorage.removeItem('_ts3');
-      btn.textContent='✅ Sent!';btn.style.background='#238636';
-    },function(){btn.textContent='📤 Send Report';btn.disabled=false;document.getElementById('sendBtn').textContent='❌ Failed — retry';});
+      btn.textContent='✅ Sent!';
+      btn.style.background='#238636';
+    },function(){
+      btn.textContent='❌ Failed — retry';
+      btn.disabled=false;
+    });
   });
 }
 function loadEJS(cb){
